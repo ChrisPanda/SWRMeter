@@ -19,7 +19,8 @@
 #include <Wire.h>                     // requried to run I2C SH1106
 //#include <SPI.h>                      // requried to run I2C SH1106
 #include <Adafruit_GFX.h>             // https://github.com/adafruit/Adafruit-GFX-Library
-#include <Adafruit_SSD1306.h>         // https://github.com/adafruit/Adafruit_SSD1306
+//#include <Adafruit_SSD1306.h>         // https://github.com/adafruit/Adafruit_SSD1306
+#include <Adafruit_SH1106.h>          // https://github.com/wonho-maker/Adafruit_SH1106
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -27,8 +28,8 @@
 // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
 #define OLED_RESET 4                  // reset required for SH1106
 
-//Adafruit_SH1106 display(OLED_RESET);  // reset required for SH1106
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+Adafruit_SH1106 display(OLED_RESET);  // reset required for SH1106
+//Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 #define s_meter_input A0             // S-Meter analog input
 #define vu_meter_input A1             // vu-Meter analog input  
@@ -61,6 +62,46 @@ int i = 0, val;
 unsigned int sample;                  // adc reading
 unsigned int last_sample;
 int dsp_Mode = _VU_MTR;
+
+#include "SWR.h"
+#include "utils.h"
+// the SWR calculator
+SWR swrData(fwd_pwr_input, rev_pwr_input);
+
+///////////////////////////////////////////////////////////////////////////////
+//
+//  REQUIRED: numeric limits for SWR hardware sensor
+//
+const int BufferLength = 24;
+
+// I/O buffer
+char ioBuffer[BufferLength];
+
+// define power limits (W); this is the power reading corresponding
+//    to a full-scale A/D reading; to report the power as a percentage
+//    of full scale, set this to 100.0.
+#define FULL_SCALE_FORWARD (20.0)
+#define FULL_SCALE_REFLECTED (20.0)
+
+// MINIMUM A/D for SWR - this is the minimum A/D reading that will produce an
+//   SWR != 1.0; this helps to prevent unnecessarily high SWR readings at low
+//   power levels where there is insufficient A/D resolution to make accurate
+//   SWR calculations.  This value is the RAW value used as a minimum FORWARD
+//   power limit.  Below this RAW value, the SWR will be reported as 1.0.
+#define MIN_POWER (5)
+
+
+// Maximum Arduino A/D reading; used only to scale the power readings.
+const int ARDUINO_AD_MAX = 1023;
+
+// maximum auto-poll interval (msec)
+const int MaxAutoPoll = 1000;
+
+// compute scaling constants for power readings
+const float FORWARD_SCALE = (float)FULL_SCALE_FORWARD / (float)ARDUINO_AD_MAX;
+const float REFLECT_SCALE = (float)FULL_SCALE_REFLECTED / (float)ARDUINO_AD_MAX;
+
+//////////////////////////////////////////////////////////////////////////////////
 
 // VU meter background mask image:
 static const unsigned char PROGMEM VUMeter[] = {
@@ -357,43 +398,45 @@ void setup() {
   pinMode(Rec_Mode_select, INPUT_PULLUP);
   pinMode(Alt_Mode_select, INPUT_PULLUP);
 
-  // display.begin(SH1106_SWITCHCAPVCC, 0x3C);   // needed for SH1106 display
-  display.begin(SSD1306_SWITCHCAPVCC, 0x3D);    // Address 0x3D for 128x64
+  display.begin(SH1106_SWITCHCAPVCC, 0x3C);   // needed for SH1106 display
+  // display.begin(SSD1306_SWITCHCAPVCC, 0x3D);    // Address 0x3D for 128x64
 
 
   display.clearDisplay();      // clears display from any library info displayed
   // display.invertDisplay(1);     // option to invert display to black on white
   dsp_Mode = _VU_MTR;            // start with default vu meter
+  Serial.begin(9600);
 }
 
 void loop() {
+  swrData.Poll();
 
   /***********************************************************************
     Code to use digital pins to select display type
   ************************************************************************/
-  select_dspMode();
+  //select_dspMode();
 
   while (dsp_Mode == _VU_MTR) {
     dsp_VU_Meter();
-    select_dspMode();
+    //select_dspMode();
   }
   while (dsp_Mode == _S_MTR) {
     dsp_S_Meter();
-    select_dspMode();
+    //select_dspMode();
   }
   while (dsp_Mode == _POWER) {
     dsp_PWR_Meter();
-    select_dspMode();
+    //select_dspMode();
   }
 
   while (dsp_Mode == _SWR) {
     dsp_SWR_Meter();
-    select_dspMode();
+    //select_dspMode();
   }
 
   while (dsp_Mode == _ALT) {
     dsp_FFT();
-    select_dspMode();
+    //select_dspMode();
   }
 }
 
@@ -457,7 +500,8 @@ void  dsp_VU_Meter() {
   unsigned int SignalMax = 0;
   unsigned int SignalMin = 1024;
   while ( millis() - startMillis < sampleWindow ) {
-    sample = analogRead(vu_meter_input);
+    //sample = analogRead(vu_meter_input);
+    sample = random (1024);      
     if (sample < 1024) {
       if (sample > SignalMax) {
         SignalMax = sample;                                // saves just the max levels
@@ -535,6 +579,7 @@ void dsp_S_Meter() {
   display.display();
 }
 
+
 void dsp_SWR_Meter() {
   unsigned long startMillis = millis();  // start of sample window
   int sampleWindow = 50;                  // 50 ms 20 Hz.
@@ -545,10 +590,14 @@ void dsp_SWR_Meter() {
   int adc_offset = 0;
   float swr = 0;   // used to adjust meter zero if a dc offset to signal
   float MeterValue;  //  convert volts to arrow information
+  /*
   while ( millis() - startMillis < sampleWindow ) {
     // get max value over 50 ms window
-    adcf = analogRead(fwd_pwr_input);
-    adcr = analogRead(rev_pwr_input);
+    //adcf = analogRead(fwd_pwr_input);
+    //adcr = analogRead(rev_pwr_input);
+    adcf = random (1024);
+    adcr = random (1024);
+    Serial.println(adcr);
     if (adcf < 1024) {
       if (adcf > pwr_fwd) {
         pwr_fwd = adcf;
@@ -556,7 +605,12 @@ void dsp_SWR_Meter() {
       }
     }
   }
-  swr = ((pwr_fwd + pwr_rev) / (pwr_fwd - pwr_rev) ) * 10;         
+  */
+
+
+//  swr = ((pwr_fwd + pwr_rev) / (pwr_fwd - pwr_rev) ) * 10;       
+    swr = random (10);
+  
   MeterValue = map(int(swr), 0, 1023 , 0, 62 - adc_offset);      // type cast to int and scale for meter range
   MeterValue = MeterValue - 36 + adc_offset;                     // shifts needle to zero position
   display.clearDisplay();                                  // refresh display for next step
@@ -565,6 +619,20 @@ void dsp_SWR_Meter() {
   int a2 = (vMeter - (cos(MeterValue / 47.296) * rMeter)); // meter needle vertical coordinate
   display.drawLine(a1, a2, hMeter, vMeter, WHITE);         // draws needle
   display.display();
+
+
+  //  SWR: read A/D and compute SWR
+  FormatFloat(ioBuffer, sizeof(ioBuffer), swrData.Value());
+  Serial.print("SWR=");
+  Serial.println(ioBuffer);
+  //  RAW: read A/D and output raw values
+  snprintf(ioBuffer, sizeof(ioBuffer), "%d", swrData.ForwardRaw());
+   // Serial.print("ForwardRaw=");
+   // Serial.println(ioBuffer);
+    
+  snprintf(ioBuffer, sizeof(ioBuffer), "%d", swrData.ReflectedRaw());
+    //  Serial.print("ReflectedRaw=");
+   // Serial.println(ioBuffer);
 }
 
 
