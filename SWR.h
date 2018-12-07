@@ -31,10 +31,6 @@
 // use a voltage calculation (sensor is a voltage sensor, not a power sensor)
 #define USE_VOLTAGE_CALC
 
-// includes
-#include "CircularBuffer.h"
-using namespace KK5JY::Collections;
-
 //
 //  SWR calculation type
 //
@@ -125,7 +121,6 @@ class SWR {
       m_AlphaFwd = 0.5;
       m_AlphaRef = 0.5;
     }
-
 
     //
     //  Poll() - read the SWR from the A/D inputs
