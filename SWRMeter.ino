@@ -119,6 +119,7 @@ void setup() {
 
 void loop() {
   swrData.Poll();                                   // spend all our spare time reading the transducer for new SWR
+  i2cMeterLoop();
 
   /***********************************************************************
     Code to use digital pins to select display type
