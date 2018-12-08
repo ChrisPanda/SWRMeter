@@ -72,6 +72,8 @@ SWR swrData(fwd_pwr_input, rev_pwr_input);              // New SWR calculator
 
 void setup() {
   Serial.begin(9600);
+
+ i2cMeterSetup();
     
   // analog input for outside  source
   pinMode(s_meter_input,  INPUT);
@@ -109,7 +111,7 @@ void setup() {
   display.print(strcpy_P(ioBuffer, PSTR(VERSION_DATE)));
   display.display();
 
-  dsp_Mode = _ALT;                               // start with default vu meter
+  dsp_Mode = _SWR;                               // start with default vu meter
   
   delay(2000);
   display.clearDisplay();
