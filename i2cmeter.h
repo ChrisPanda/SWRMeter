@@ -6,6 +6,7 @@ KD8CEC, Ian Lee
 -----------------------------------------------------------------------
 
 **********************************************************************/
+#ifdef I2C_H
 
 #include <arduino.h>
 
@@ -73,4 +74,5 @@ extern int magnitudelimit_low;
 #define POWER_METER_ADC   A3
 #define SWR_METER_ADC     A2
 
+#endif  // I2C_H
 

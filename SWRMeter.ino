@@ -21,10 +21,16 @@
 #include <Adafruit_GFX.h>                   // https://github.com/adafruit/Adafruit-GFX-Library
 //#include <Adafruit_SSD1306.h>             // https://github.com/adafruit/Adafruit_SSD1306
 #include <Adafruit_SH1106.h>                // https://github.com/wonho-maker/Adafruit_SH1106
+#include <OneButton.h>
 #include "SWR.h"                            // New SWR Sensor
 #include "SWRMeter.h"                       // New SWR Sensor
 #include "image.h"                          // background mask image for OLED Meter
 #include "utils.h"
+
+
+#undef I2C_H
+#undef SWR_H
+#define _ENABLE_MENU
 
 #define VERSION_DATE  "20181207"
 
@@ -37,15 +43,20 @@
 Adafruit_SH1106 display(OLED_RESET);    // reset required for SH1106
 //Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-#define s_meter_input A0                // S-Meter analog input
-#define vu_meter_input A1               // vu-Meter analog input
+#include "menu.h"
+
+#define s_meter_input A0                // S-Meter analog input (from AGC line)
+#define vu_meter_input A1               // vu-Meter analog input (from audio signal)
 #define fwd_pwr_input A2                // forward power meter analog input
 #define rev_pwr_input A3                // reverse power meter analog input
 
-#define RecXmt_select 10                // receive transmit  select
-#define Xmt_Mode_select 11              // transmit disp select  power or swr
-#define Rec_Mode_select 12              // receive disp select  s-meter or vu meter
+#define RecXmt_select 10                // receive transmit select (this can come from the PTT or key line)
+
+int Xmt_Mode_select=0;              // transmit disp select power or swr (default power)
+int Rec_Mode_select=0;              // receive disp select s-meter or vu meter (default s-meter)
 #define Alt_Mode_select 13              // alternate display mode select
+
+OneButton button(A4, true);
 
 #define  _S_MTR      0
 #define  _VU_MTR     1
@@ -54,6 +65,7 @@ Adafruit_SH1106 display(OLED_RESET);    // reset required for SH1106
 #define  _ALT        4
 
 int lc = 0;
+boolean menuEnable=true;
 
 int analogInput = vu_meter_input;       // analog input being read at this time
 int hMeter = 65;                        // horizontal center for needle animation
@@ -73,17 +85,15 @@ SWR swrData(fwd_pwr_input, rev_pwr_input);              // New SWR calculator
 void setup() {
   Serial.begin(9600);
 
- i2cMeterSetup();
+  //i2cMeterSetup();
     
   // analog input for outside  source
   pinMode(s_meter_input,  INPUT);
   pinMode(vu_meter_input, INPUT);
   pinMode(fwd_pwr_input,  INPUT);
   pinMode(rev_pwr_input,  INPUT);
-
   pinMode(RecXmt_select,   INPUT_PULLUP);
-  pinMode(Xmt_Mode_select, INPUT_PULLUP);
-  pinMode(Rec_Mode_select, INPUT_PULLUP);
+  
   pinMode(Alt_Mode_select, INPUT_PULLUP);
 
   // configure the new SWR algorithm
@@ -98,7 +108,7 @@ void setup() {
   display.clearDisplay();                           // clears display from any library info displayed
   // display.invertDisplay(1);                      // option to invert display to black on white
 
-  display.setTextSize(2);
+  display.setTextSize(1);
   display.setTextColor(WHITE);
   strcpy_P(ioBuffer, PSTR("SWR Meter"));
   const uint8_t x = (SCREEN_WIDTH - strlen(ioBuffer)) / 2;
@@ -112,41 +122,68 @@ void setup() {
   display.display();
 
   dsp_Mode = _SWR;                               // start with default vu meter
-  
+
+#ifdef _ENABLE_MENU
+  button.attachDuringLongPress(showHideMmenu);
+  button.attachClick(changeMenuItem);
+  button.attachDoubleClick(selectMenuItem);
+
+  ms.get_root_menu().add_menu(&mu1);
+  mu1.add_item(&mu1_mi1);
+  mu1.add_item(&mu1_mi2);
+
+  ms.get_root_menu().add_menu(&mu2);
+  mu2.add_item(&mu2_mi1);
+  mu2.add_item(&mu2_mi2);
+
+  ms.get_root_menu().add_item(&mm_mi1);
+#endif // _ENABLE_MENU
+
   delay(2000);
   display.clearDisplay();
 }
 
 void loop() {
   swrData.Poll();                                   // spend all our spare time reading the transducer for new SWR
+
+#ifdef I2C_H  
   i2cMeterLoop();
+#endif
 
-  /***********************************************************************
-    Code to use digital pins to select display type
-  ************************************************************************/
-  //select_dspMode();
-
-  while (dsp_Mode == _VU_MTR) {
-    dsp_VU_Meter();
-    //select_dspMode();
-  }
-  while (dsp_Mode == _S_MTR) {
-    dsp_S_Meter();
-    //select_dspMode();
-  }
-  while (dsp_Mode == _POWER) {
-    dsp_PWR_Meter();
-    //select_dspMode();
-  }
-
-  while (dsp_Mode == _SWR) {
-    dsp_SWR_Meter();
-    //select_dspMode();
-  }
-
-  while (dsp_Mode == _ALT) {
-    dsp_FFT();
-    //select_dspMode();
+#ifdef _ENABLE_MENU
+   if (menuEnable) {
+     ms.display();
+   }
+   else 
+#endif  //
+  {
+    /***********************************************************************
+      Code to use digital pins to select display type
+    ************************************************************************/
+    select_dspMode();
+  
+    while (dsp_Mode == _VU_MTR) {
+      dsp_VU_Meter();
+      select_dspMode();
+    }
+    while (dsp_Mode == _S_MTR) {
+      dsp_S_Meter();
+      select_dspMode();
+    }
+    while (dsp_Mode == _POWER) {
+      dsp_PWR_Meter();
+      select_dspMode();
+    }
+  
+    while (dsp_Mode == _SWR) {
+      dsp_SWR_Meter();
+      select_dspMode();
+    }
+  
+    while (dsp_Mode == _ALT) {
+      dsp_FFT();
+      select_dspMode();
+    }
   }
 }
 
@@ -347,11 +384,15 @@ void dsp_SWR_Meter() {
 }
 
 void select_dspMode() {
+  button.tick();
+  
+  return;
+
   if (digitalRead(RecXmt_select) == LOW) {
-    if (digitalRead(Xmt_Mode_select) == LOW)dsp_Mode = _SWR;
+    if (Xmt_Mode_select == 0) dsp_Mode = _SWR;
     else dsp_Mode = _POWER;
   }
-  else if (digitalRead(Rec_Mode_select) == LOW)
+  else if (Rec_Mode_select == 0)
     dsp_Mode = _VU_MTR;
   else
     dsp_Mode = _S_MTR;

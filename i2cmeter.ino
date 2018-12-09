@@ -4,6 +4,7 @@ KD8CEC, Ian Lee
 -----------------------------------------------------------------------
 License : See fftfunctions.cpp for FFT and CW Decode.
 **********************************************************************/
+#ifdef I2C_H
 
 #include <EEPROM.h>
 #include "i2cmeter.h"
@@ -969,4 +970,4 @@ void i2cMeterLoop()
   } //enf of if 
 } //end of main
 
-
+#endif  // I2C_H

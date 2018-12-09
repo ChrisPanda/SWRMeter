@@ -26,7 +26,6 @@
  */
 
 #ifndef SWR_H
-#define SWR_H
 
 // use a voltage calculation (sensor is a voltage sensor, not a power sensor)
 #define USE_VOLTAGE_CALC

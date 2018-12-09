@@ -7,6 +7,9 @@ KD8CEC, Ian Lee
 License : I follow the license of the previous code and I do not add any extra constraints.
 I hope that the Comment I made or the Comment of OZ1JHM will be maintained.
 **********************************************************************/
+
+#ifdef I2C_H
+
 #include <arduino.h>
 #include "i2cmeter.h"
 
@@ -359,4 +362,4 @@ void Decode_Morse(float magnitude)
   lasthighduration = highduration;
   filteredstatebefore = filteredstate;
 }
-
+#endif  // I2C_H
