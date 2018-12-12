@@ -52,8 +52,8 @@ Adafruit_SH1106 display(OLED_RESET);    // reset required for SH1106
 
 #define RecXmt_select 10                // receive transmit select (this can come from the PTT or key line)
 
-int Xmt_Mode_select=0;              // transmit disp select power or swr (default power)
-int Rec_Mode_select=0;              // receive disp select s-meter or vu meter (default s-meter)
+int Xmt_Mode_select=0;              // transmit disp select swr or power
+int Rec_Mode_select=0;              // receive disp select vu meter or s-meter
 #define Alt_Mode_select 13              // alternate display mode select
 
 OneButton button(A4, true);
@@ -150,40 +150,47 @@ void loop() {
   i2cMeterLoop();
 #endif
 
+  /***********************************************************************
+    Code to use digital pins to select display type
+  ************************************************************************/
+  select_dspMode();
+
+  while (dsp_Mode == _VU_MTR) {
 #ifdef _ENABLE_MENU
-   if (menuEnable) {
-     ms.display();
-   }
-   else 
-#endif  //
-  {
-    /***********************************************************************
-      Code to use digital pins to select display type
-    ************************************************************************/
-    select_dspMode();
-  
-    while (dsp_Mode == _VU_MTR) {
+    if (!menuEnable)
       dsp_VU_Meter();
-      select_dspMode();
-    }
-    while (dsp_Mode == _S_MTR) {
+#endif
+    select_dspMode();
+  }
+  while (dsp_Mode == _S_MTR) {
+#ifdef _ENABLE_MENU
+    if (!menuEnable)
       dsp_S_Meter();
-      select_dspMode();
-    }
-    while (dsp_Mode == _POWER) {
+#endif
+    select_dspMode();
+  }
+  while (dsp_Mode == _POWER) {
+#ifdef _ENABLE_MENU
+    if (!menuEnable)
       dsp_PWR_Meter();
-      select_dspMode();
-    }
-  
-    while (dsp_Mode == _SWR) {
+#endif
+    select_dspMode();
+  }
+
+  while (dsp_Mode == _SWR) {
+#ifdef _ENABLE_MENU
+    if (!menuEnable)
       dsp_SWR_Meter();
-      select_dspMode();
-    }
-  
-    while (dsp_Mode == _ALT) {
+#endif
+    select_dspMode();
+  }
+
+  while (dsp_Mode == _ALT) {
+#ifdef _ENABLE_MENU
+    if (!menuEnable)
       dsp_FFT();
-      select_dspMode();
-    }
+#endif
+    select_dspMode();
   }
 }
 
@@ -385,12 +392,19 @@ void dsp_SWR_Meter() {
 
 void select_dspMode() {
   button.tick();
-  
-  return;
+
+#ifdef _ENABLE_MENU
+  if (menuEnable) {
+    ms.display();
+    return;
+  }
+#endif
 
   if (digitalRead(RecXmt_select) == LOW) {
-    if (Xmt_Mode_select == 0) dsp_Mode = _SWR;
-    else dsp_Mode = _POWER;
+    if (Xmt_Mode_select == 0)
+      dsp_Mode = _SWR;
+    else
+      dsp_Mode = _POWER;
   }
   else if (Rec_Mode_select == 0)
     dsp_Mode = _VU_MTR;

@@ -1,40 +1,35 @@
 /*
  OLED Menu System
 */
-bool done = false;
+extern boolean menuEnable;
+extern int Xmt_Mode_select;              // transmit disp select swr or power
+extern int Rec_Mode_select;              // receive disp select vu meter or s-meter
 
-void on_item_smeter_selected(MenuComponent* p_menu_component) {
-  Serial.println("on_item_smeter_selected");
-  
-  display.setCursor(0,55);
-  display.print("S-Meter Selected");
-}
-
-void on_item_vumeter_selected(MenuComponent* p_menu_component) {
+void on_item_rec_vumeter_selected(MenuComponent* p_menu_component) {
   Serial.println("on_item_vumeter_selected");
-  display.setCursor(0,55);
-  display.print("VU-Meter Selected");
+  Rec_Mode_select = 0;
 }
 
-void on_item_swr_selected(MenuComponent* p_menu_component) {
+void on_item_rec_smeter_selected(MenuComponent* p_menu_component) {
+  Serial.println("on_item_smeter_selected");
+  Rec_Mode_select = 1;
+}
+
+void on_item_xmt_swr_selected(MenuComponent* p_menu_component) {
   Serial.println("on_item_swr_selected");
-  done = true;
-  display.setCursor(0,55);
-  display.print("SWR Selected");
+  Xmt_Mode_select = 0;
 }
 
-void on_item_power_selected(MenuComponent* p_menu_component) {
+void on_item_xmt_power_selected(MenuComponent* p_menu_component) {
   Serial.println("on_item_power_selected");
-  done = true;
-  display.setCursor(0,55);
-  display.print("POWER Selected");
+  Xmt_Mode_select = 1;
 }
+
 
 void on_item_exit_selected(MenuComponent* p_menu_component) {
-    Serial.println("on_item_exit_selected");
-    
-    display.setCursor(0,55);
-    display.print("exit Selected");
+  Serial.println("on_item_exit_selected");
+
+  menuEnable = false;
 }
 
 // Menu callback function
@@ -53,13 +48,13 @@ void showHideMmenu() {
 }
 
 void changeMenuItem() {
-    Serial.println("changeMenuItem...");
-    ms.next();
-    ms.display();
+  Serial.println("changeMenuItem...");
+  ms.next();
+  ms.display();
 }
 
 void selectMenuItem() {
-    Serial.println("selectMenuItem...");
-    ms.select();
-    ms.display();
+  Serial.println("selectMenuItem...");
+  ms.select();
+  ms.display();
 }
