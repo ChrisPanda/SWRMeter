@@ -1,15 +1,17 @@
 #include <MenuSystem.h>
 
 //  https://github.com/jonblack/arduino-menusystem
-
+int line;
+  
 class MyRenderer : public MenuComponentRenderer {
+      
 public:
    void render(Menu const& menu) const {
 /*
       MenuComponent const* cp_menu_sel = menu.get_selected();
       menu.get_current_component()->render(*this);
 */
-        protected int line=10;
+        line=10;
         display.clearDisplay(); 
         display.setCursor(0,0);
         display.println("Setup Menu ");

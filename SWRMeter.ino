@@ -16,11 +16,11 @@
     IMPORTANT: Sound source must be grounded to the Arduino or other MCU's to work. Usually the
     base sleeve contact on TRS or TRRS connector is the ground.
 */
-#include "fix_fft.h"
 #include <Wire.h>                           // requried to run I2C SH1106
 #include <Adafruit_GFX.h>                   // https://github.com/adafruit/Adafruit-GFX-Library
 //#include <Adafruit_SSD1306.h>             // https://github.com/adafruit/Adafruit_SSD1306
 #include <Adafruit_SH1106.h>                // https://github.com/wonho-maker/Adafruit_SH1106
+#include <fix_fft.h>
 #include <OneButton.h>
 #include "SWR.h"                            // New SWR Sensor
 #include "SWRMeter.h"                       // New SWR Sensor
@@ -52,8 +52,8 @@ Adafruit_SH1106 display(OLED_RESET);    // reset required for SH1106
 
 #define RecXmt_select 10                // receive transmit select (this can come from the PTT or key line)
 
-int Xmt_Mode_select=0;              // transmit disp select swr or power
-int Rec_Mode_select=0;              // receive disp select vu meter or s-meter
+int Xmt_Mode_select=0;                  // select swr or power when transmit display
+int Rec_Mode_select=0;                  // select vu meter or s-meter when receive display
 #define Alt_Mode_select 13              // alternate display mode select
 
 OneButton button(A4, true);
@@ -73,7 +73,7 @@ int vMeter = 85;                        // vertical center for needle animation 
 int rMeter = 80;                        // length of needle animation or arch of needle travel
 
 char im[128], data[128];                //variables for the FFT
-char x = 0, ylim = 60;                   //variables for drawing the graphics
+char x = 0, ylim = 60;                  //variables for drawing the graphics
 int i = 0, val;
 // sample window width in mS (50 mS = 20Hz)
 unsigned int sample;                  // adc reading
@@ -104,7 +104,6 @@ void setup() {
   display.begin(SH1106_SWITCHCAPVCC, 0x3C);             // needed for SH1106 display
   // display.begin(SSD1306_SWITCHCAPVCC, 0x3D);         // Address 0x3D for 128x64
 
-  
   display.clearDisplay();                           // clears display from any library info displayed
   // display.invertDisplay(1);                      // option to invert display to black on white
 
@@ -153,28 +152,28 @@ void loop() {
   /***********************************************************************
     Code to use digital pins to select display type
   ************************************************************************/
-  select_dspMode();
+  check_dspModeMenu();
 
   while (dsp_Mode == _VU_MTR) {
 #ifdef _ENABLE_MENU
     if (!menuEnable)
       dsp_VU_Meter();
 #endif
-    select_dspMode();
+    check_dspModeMenu();
   }
   while (dsp_Mode == _S_MTR) {
 #ifdef _ENABLE_MENU
     if (!menuEnable)
       dsp_S_Meter();
 #endif
-    select_dspMode();
+    check_dspModeMenu();
   }
   while (dsp_Mode == _POWER) {
 #ifdef _ENABLE_MENU
     if (!menuEnable)
       dsp_PWR_Meter();
 #endif
-    select_dspMode();
+    check_dspModeMenu();
   }
 
   while (dsp_Mode == _SWR) {
@@ -182,7 +181,7 @@ void loop() {
     if (!menuEnable)
       dsp_SWR_Meter();
 #endif
-    select_dspMode();
+    check_dspModeMenu();
   }
 
   while (dsp_Mode == _ALT) {
@@ -190,7 +189,7 @@ void loop() {
     if (!menuEnable)
       dsp_FFT();
 #endif
-    select_dspMode();
+    check_dspModeMenu();
   }
 }
 
@@ -244,6 +243,29 @@ void loop() {
 ************* END sample display mode *************/
 
 // ***************** End of Loop ************
+
+
+void check_dspModeMenu() {
+  button.tick();
+
+#ifdef _ENABLE_MENU
+  if (menuEnable) {
+    ms.display();
+    return;
+  }
+#endif
+
+  if (digitalRead(RecXmt_select) == LOW) {
+    if (Xmt_Mode_select == 0)
+      dsp_Mode = _SWR;
+    else
+      dsp_Mode = _POWER;
+  }
+  else if (Rec_Mode_select == 0)
+    dsp_Mode = _VU_MTR;
+  else
+    dsp_Mode = _S_MTR;
+}
 
 void  dsp_VU_Meter() {
   unsigned long startMillis = millis();                 // start of sample window
@@ -340,14 +362,12 @@ void dsp_SWR_Meter() {
   int adc_offset = 0;
   float swr = 0;                                                  // used to adjust meter zero if a dc offset to signal
   float MeterValue;                                               //  convert volts to arrow information
-  /*
+
   while ( millis() - startMillis < sampleWindow ) {
     // get max value over 50 ms window
-    //adcf = analogRead(fwd_pwr_input);
-    //adcr = analogRead(rev_pwr_input);
-    adcf = random (1024);
-    adcr = random (1024);
-    Serial.println(adcr);
+    adcf = analogRead(fwd_pwr_input);
+    adcr = analogRead(rev_pwr_input);
+    //Serial.println(adcr);
     if (adcf < 1024) {
       if (adcf > pwr_fwd) {
         pwr_fwd = adcf;
@@ -355,11 +375,8 @@ void dsp_SWR_Meter() {
       }
     }
   }
-  */
+  swr = ((pwr_fwd + pwr_rev) / (pwr_fwd - pwr_rev) ) * 10;
 
-//  swr = ((pwr_fwd + pwr_rev) / (pwr_fwd - pwr_rev) ) * 10;       
-  swr = random (1023);    //test
-  
   MeterValue = map(int(swr), 0, 1023 , 0, 62 - adc_offset);           // type cast to int and scale for meter range
   MeterValue = MeterValue - 36 + adc_offset;                          // shifts needle to zero position
   display.clearDisplay();                                             // refresh display for next step
@@ -388,28 +405,6 @@ void dsp_SWR_Meter() {
   snprintf(ioBuffer, sizeof(ioBuffer), "%d", swrData.ReflectedRaw());
   // Serial.print("ReflectedRaw=");
   // Serial.println(ioBuffer);
-}
-
-void select_dspMode() {
-  button.tick();
-
-#ifdef _ENABLE_MENU
-  if (menuEnable) {
-    ms.display();
-    return;
-  }
-#endif
-
-  if (digitalRead(RecXmt_select) == LOW) {
-    if (Xmt_Mode_select == 0)
-      dsp_Mode = _SWR;
-    else
-      dsp_Mode = _POWER;
-  }
-  else if (Rec_Mode_select == 0)
-    dsp_Mode = _VU_MTR;
-  else
-    dsp_Mode = _S_MTR;
 }
 
 void dsp_FFT() {

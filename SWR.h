@@ -138,13 +138,13 @@ class SWR {
       } else if (m_Reflected >= m_Forward) {
         wf = m_MaxSWR;
       } else {
-        #ifdef USE_VOLTAGE_CALC
+#ifdef USE_VOLTAGE_CALC
         wf = (float)(m_Forward + m_Reflected) / (float)(m_Forward - m_Reflected);
-        #else
+#else
         wf = (float)m_Forward / (float)m_Reflected;
         wf = sqrt(wf);
         wf = (1.0 + wf) / (1.0 - wf);
-        #endif
+#endif
         wf = abs(wf);
       }
         
