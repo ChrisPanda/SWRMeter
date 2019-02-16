@@ -7,6 +7,7 @@ KD8CEC, Ian Lee
 License : I follow the license of the previous code and I do not add any extra constraints.
 I hope that the Comment I made or the Comment of OZ1JHM will be maintained.
 **********************************************************************/
+#include "define.h"
 
 #ifdef I2C_H
 

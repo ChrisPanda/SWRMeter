@@ -70,6 +70,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 The latest version of this library can always be found at
 http://arduiniana.org.
  */
+#include "define.h"
+ 
 #ifdef I2C_H
  
 #include "i2cmeter.h"

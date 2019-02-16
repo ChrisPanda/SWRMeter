@@ -4,6 +4,8 @@ KD8CEC, Ian Lee
 -----------------------------------------------------------------------
 License : See fftfunctions.cpp for FFT and CW Decode.
 **********************************************************************/
+#include "define.h"
+
 #ifdef I2C_H
 
 #include <EEPROM.h>
@@ -701,7 +703,7 @@ void i2cMeterSetup()
   Serial.flush();
   SAMPLE_INTERVAL = round(1000000 * (1.0 / SAMPLE_PREQUENCY));
   CalculateCoeff(cwDecodeHz);  //Set 750Hz //9 * 50 + 300 = 750Hz
-  //Serial.println("Start...");
+  Serial.println("o2c Start...");
 }
 
 void I2CReceiveEvent(int howMany)
@@ -798,6 +800,8 @@ void i2cMeterLoop()
 {
   char isProcess = 0; //0 : Init, 1 : Complete ADC Sampling, 2 : Complete FFT
   isProcess = 0;
+
+  // Serial.println("i2cMeterLoop");
 
   ForwardData();
   if (isBooted < 100)

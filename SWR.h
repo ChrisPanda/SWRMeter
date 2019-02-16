@@ -24,6 +24,7 @@
  *
  *
  */
+#include "define.h"
 
 #ifndef SWR_H
 

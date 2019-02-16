@@ -18,26 +18,29 @@ public:
         for (int i = 0; i < menu.get_num_components(); ++i) {
             MenuComponent const* cp_m_comp = menu.get_menu_component(i);
             if (cp_m_comp->is_current()) {
-                Serial.print("<<< ");
+                //Serial.print("<<< ");
                 display.setCursor(0, line);
                 display.print(">>> ");
             }
             cp_m_comp->render(*this);
             line = line + 10;             
-            Serial.println("");
+            //Serial.println("");
         }
         display.display();
    }
 
    void render_menu_item(MenuItem const& menu_item) const {
-      Serial.print(menu_item.get_name());
+      //Serial.print(menu_item.get_name());
       display.setCursor(30, line);
       display.println(menu_item.get_name());
    }
 
    void render_back_menu_item(BackMenuItem const& menu_item) const {
-      Serial.print("BACK ITEM1=");
-      Serial.print(menu_item.get_name());
+      //Serial.print("BACK ITEM1=");
+      //Serial.print(menu_item.get_name());
+      
+      display.setCursor(30, line);
+      display.println(menu_item.get_name());
    }
 
    void render_numeric_menu_item(NumericMenuItem const& menu_item) const {
@@ -47,8 +50,8 @@ public:
    }
 
    void render_menu(Menu const& menu) const {
-       Serial.print("render_menu=");
-       Serial.print(menu.get_name());
+       //Serial.print("render_menu=");
+       //Serial.print(menu.get_name());
        display.setCursor(30, line);
        display.print(menu.get_name());
    }
@@ -62,17 +65,23 @@ void on_item_xmt_power_selected(MenuComponent* p_menu_component);
 void on_item_rec_smeter_selected(MenuComponent* p_menu_component);
 void on_item_rec_vumeter_selected(MenuComponent* p_menu_component);
 void on_item_exit_selected(MenuComponent* p_menu_component);
+void on_item_back_selected(MenuComponent* p_menu_component);
 
 // Menu variables
 MenuSystem ms(my_renderer);
 
 Menu mu1("Transmit Mode");
-MenuItem mu1_mi1("Transmit Mode: SWR",   &on_item_xmt_swr_selected);
-MenuItem mu1_mi2("Transmit Mode: Power", &on_item_xmt_power_selected);
+MenuItem mu1_mi1("SWR",   &on_item_xmt_swr_selected);
+MenuItem mu1_mi2("Power", &on_item_xmt_power_selected);
+MenuItem mu1_mi3("Exit Menu",  &on_item_exit_selected);
+
+BackMenuItem mu1_back("Back Menu", &on_item_back_selected, &ms);
 
 Menu mu2("Receive Mode");
-MenuItem mu2_mi1("Transmit Mode: SWR",   &on_item_rec_smeter_selected);
-MenuItem mu2_mi2("Transmit Mode: Power", &on_item_rec_vumeter_selected);
+MenuItem mu2_mi1("S-Meter",  &on_item_rec_smeter_selected);
+MenuItem mu2_mi2("VU-Meter", &on_item_rec_vumeter_selected);
+MenuItem mu2_mi3("Exit Menu",     &on_item_exit_selected);
 
-MenuItem mm_mi1("EXIT Menu", &on_item_exit_selected);
+BackMenuItem mu2_back("Back Menu", &on_item_back_selected, &ms);
 
+MenuItem mm_mi1("Exit Menu", &on_item_exit_selected);
