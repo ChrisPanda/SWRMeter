@@ -662,6 +662,10 @@ void SendFFTData(void)
 
 void i2cMeterSetup() 
 {
+  pinMode(SIGNAL_METER_ADC,  INPUT);
+  pinMode(POWER_METER_ADC, INPUT);
+  pinMode(SWR_METER_ADC, INPUT);
+    
   //Load Configuration
   EEPROM.get(EEPROM_DSPTYPE, DSPType);
   if (DSPType > 5)

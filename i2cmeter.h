@@ -72,6 +72,7 @@ extern int magnitudelimit_low;
 #define I2CMETER_CALCR    0x55 //Calculated SWR Meter
 #define I2CMETER_UNCALCR  0x54 //Uncalculated SWR Meter
 
+// Input Pin
 #define SIGNAL_METER_ADC  A7
 #define POWER_METER_ADC   A3
 #define SWR_METER_ADC     A2

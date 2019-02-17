@@ -16,17 +16,18 @@
     IMPORTANT: Sound source must be grounded to the Arduino or other MCU's to work. Usually the
     base sleeve contact on TRS or TRRS connector is the ground.
 */
-#include <Wire.h>                           // requried to run I2C SH1106
+#include <Wire.h>
 #include <Adafruit_GFX.h>                   // https://github.com/adafruit/Adafruit-GFX-Library
 #include <Adafruit_SSD1306.h>               // https://github.com/adafruit/Adafruit_SSD1306
-//#include <Adafruit_SH1106.h>                // https://github.com/wonho-maker/Adafruit_SH1106
+//#include <Adafruit_SH1106.h>              // https://github.com/wonho-maker/Adafruit_SH1106
 #include <fix_fft.h>
 #include <OneButton.h>
+#include "define.h"
 #include "SWR.h"                            // New SWR Sensor
 #include "SWRMeter.h"                       // New SWR Sensor
 #include "image.h"                          // background mask image for OLED Meter
 #include "utils.h"
-#include "define.h"
+#include "menu.h"
 
 #define SCREEN_WIDTH 128                // OLED display width, in pixels
 #define SCREEN_HEIGHT 64                // OLED display height, in pixels
@@ -46,20 +47,13 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, OLED_MOSI, OLED_CLK, OLED_
 Adafruit_SH1106 display(OLED_RESET);    // reset required for SH1106
 #endif
 
-#include "menu.h"
+#define s_meter_input  A8               // S-Meter analog input (from AGC line)
+#define vu_meter_input A9               // vu-Meter analog input (from audio signal)
+#define fwd_pwr_input  A10              // forward power meter analog input
+#define rev_pwr_input  A11              // reverse power meter analog input
 
-#define s_meter_input  A0               // S-Meter analog input (from AGC line)
-#define vu_meter_input A1               // vu-Meter analog input (from audio signal)
-#define fwd_pwr_input  A2               // forward power meter analog input
-#define rev_pwr_input  A3               // reverse power meter analog input
-
-#define RecXmt_select 7                 // receive transmit select (this can come from the PTT or key line)
-
-int Xmt_Mode_select=0;                  // select swr or power when transmit display
-int Rec_Mode_select=0;                  // select vu meter or s-meter when receive display
+#define RecXmt_select   7               // receive transmit select (this can come from the PTT or key line)
 #define Alt_Mode_select 8               // alternate display mode select
-
-OneButton button(A4, true);
 
 #define  _S_MTR      0
 #define  _VU_MTR     1
@@ -67,23 +61,20 @@ OneButton button(A4, true);
 #define  _SWR        3
 #define  _ALT        4
 
-int lc = 0;
+OneButton button(A4, true);
+
+int Xmt_Mode_select;                    // select swr or power when transmit display
+int Rec_Mode_select;                    // select vu meter or s-meter when receive display
 boolean menuEnable;
-
 int analogInput = vu_meter_input;       // analog input being read at this time
-int hMeter = 65;                        // horizontal center for needle animation
-int vMeter = 85;                        // vertical center for needle animation (outside of dislay limits)
-int rMeter = 80;                        // length of needle animation or arch of needle travel
-
-char im[128], data[128];                //variables for the FFT
-char x = 0, ylim = 60;                  //variables for drawing the graphics
-int i = 0, val;
-// sample window width in mS (50 mS = 20Hz)
-unsigned int sample;                  // adc reading
-unsigned int last_sample;
 int dsp_Mode = _VU_MTR;
+const int hMeter = 65;                  // horizontal center for needle animation
+const int vMeter = 85;                  // vertical center for needle animation (outside of dislay limits)
+const int rMeter = 80;                  // length of needle animation or arch of needle travel
 
+#ifdef SWR_H  
 SWR swrData(fwd_pwr_input, rev_pwr_input);              // New SWR calculator
+#endif
 
 void setup() {
   Serial.begin(9600);
@@ -98,13 +89,14 @@ void setup() {
   pinMode(fwd_pwr_input,  INPUT);
   pinMode(rev_pwr_input,  INPUT);
   pinMode(RecXmt_select,   INPUT_PULLUP);
-  
   pinMode(Alt_Mode_select, INPUT_PULLUP);
 
+#ifdef SWR_H
   // configure the new SWR algorithm
   swrData.MinPower(MIN_POWER);
   swrData.ScaleForward(FORWARD_SCALE);
   swrData.ScaleReflected(REFLECT_SCALE);
+#endif
 
 #ifdef SSD1306
   display.begin(SSD1306_SWITCHCAPVCC);         // Address 0x3D for 128x64
@@ -119,8 +111,8 @@ void setup() {
   display.setTextColor(WHITE);
   strcpy_P(ioBuffer, PSTR("Analog Meter: "));
   const uint8_t x = (SCREEN_WIDTH - strlen(ioBuffer)) / 2;
-  Serial.print("x=");
-  Serial.println(x);
+  //Serial.print("x=");
+  //Serial.println(x);
   
   display.setCursor(0, 20);
   display.print(ioBuffer);
@@ -128,7 +120,9 @@ void setup() {
   display.print(strcpy_P(ioBuffer, PSTR(VERSION)));
   display.display();
 
-  dsp_Mode = _SWR;                               // start with default vu meter
+  Xmt_Mode_select=0;                            // select default mode when transmit display
+  Rec_Mode_select=0;                            // select  default mode when receive display
+  dsp_Mode = _SWR;                              // start with default vu meter
 
 #ifdef _ENABLE_MENU
   menuEnable = false;
@@ -154,116 +148,54 @@ void setup() {
   button.setDebounceTicks(80);
 #endif // _ENABLE_MENU
 
-  delay(2000);
+  delay(1500);
   display.clearDisplay();
 }
 
 void loop() {
-  /***********************************************************************
-    Code to use digital pins to select display type
-  ************************************************************************/
-  check_dspModeMenu();
+  checkI2CnMenu();
 
   while (dsp_Mode == _VU_MTR) {
 #ifdef _ENABLE_MENU
     if (!menuEnable)
-      dsp_VU_Meter();
 #endif
-    check_dspModeMenu();
+      dsp_VU_Meter();
+    checkI2CnMenu();
   }
   while (dsp_Mode == _S_MTR) {
 #ifdef _ENABLE_MENU
     if (!menuEnable)
-      dsp_S_Meter();
 #endif
-    check_dspModeMenu();
+      dsp_S_Meter();
+    checkI2CnMenu();
   }
   while (dsp_Mode == _POWER) {
 #ifdef _ENABLE_MENU
     if (!menuEnable)
-      dsp_PWR_Meter();
 #endif
-    check_dspModeMenu();
+      dsp_PWR_Meter();
+    checkI2CnMenu();
   }
 
   while (dsp_Mode == _SWR) {
 #ifdef _ENABLE_MENU
     if (!menuEnable)
-      dsp_SWR_Meter();
 #endif
-    check_dspModeMenu();
+      dsp_SWR_Meter();
+    checkI2CnMenu();
   }
 
   while (dsp_Mode == _ALT) {
 #ifdef _ENABLE_MENU
     if (!menuEnable)
-      dsp_FFT();
 #endif
-    check_dspModeMenu();
+      dsp_FFT();
+    checkI2CnMenu();
   }
 }
 
-/***********************************************************************
-  Sample code to display each available display mode in sequence
-***********************************************************************
-  while (dsp_Mode == _VU_MTR) {
-      dsp_VU_Meter();
-      lc++;
-      if (lc > 100) {
-        dsp_Mode ++;
-        lc = 0;
-      }
-  }
-  while (dsp_Mode == _S_MTR) {
-      dsp_S_Meter();
-      lc++;
-      if (lc > 100) {
-        dsp_Mode++;
-        lc = 0;
-      }
-  }
-  while (dsp_Mode == _POWER) {
-      dsp_PWR_Meter();
-      lc++;
-      if (lc > 100) {
-        dsp_Mode++;
-        lc = 0;
-      }
-  }
-  while (dsp_Mode == _SWR  ) {
-      dsp_SWR_Meter();
-      lc++;
-      if (lc > 100) {
-        dsp_Mode++;
-        lc = 0;
-      }
-  }
-  while (dsp_Mode == _ALT ) {
-      dsp_FFT();
-      lc++;
-      if (lc > 100) {
-        dsp_Mode++;
-        lc = 0;
-      }
-  }
-  if (dsp_Mode > 4) {
-      dsp_Mode = 0;
-      lc = 0;
-  }
-************* END sample display mode *************/
-
-// ***************** End of Loop ************
-
-
-void check_i2cMeter() {
-  swrData.Poll();                                   // spend all our spare time reading the transducer for new SWR
-
-#ifdef I2C_H  
-  i2cMeterLoop();
-#endif
-}
-
-void check_dspModeMenu() {
+// check I2C communication and Menu
+void checkI2CnMenu() {
   button.tick();
 
 #ifdef _ENABLE_MENU
@@ -288,7 +220,13 @@ void check_dspModeMenu() {
       dsp_Mode = _S_MTR;
   }
 
-  check_i2cMeter();
+#ifdef SWR_H
+  swrData.Poll();                                   // spend all our spare time reading the transducer for new SWR
+#endif
+
+#ifdef I2C_H
+  i2cMeterLoop();
+#endif
 }
 
 void  dsp_VU_Meter() {
@@ -297,6 +235,8 @@ void  dsp_VU_Meter() {
   unsigned int PeaktoPeak = 0;                          // peak-to-peak level
   unsigned int SignalMax = 0;
   unsigned int SignalMin = 1024;
+  unsigned int sample;                                  // adc reading
+
   while ( millis() - startMillis < sampleWindow ) {
     //sample = analogRead(vu_meter_input);
     sample = random (1024);      // test
@@ -411,7 +351,9 @@ void dsp_SWR_Meter() {
   //display.display();
 
   //  SWR: read A/D and compute SWR
-  //FormatFloat(ioBuffer, sizeof(ioBuffer), swrData.Value());
+#ifdef SWR_H  
+  FormatFloat(ioBuffer, sizeof(ioBuffer), swrData.Value());
+#endif  
   FormatFloat(ioBuffer, sizeof(ioBuffer), swr);
   //Serial.print("SWR=");
   //Serial.println(ioBuffer);
@@ -423,6 +365,7 @@ void dsp_SWR_Meter() {
   display.display();
   
   //  RAW: read A/D and output raw values
+#ifdef SWR_H
   snprintf(ioBuffer, sizeof(ioBuffer), "%d", swrData.ForwardRaw());
   // Serial.print("ForwardRaw=");
   // Serial.println(ioBuffer);
@@ -430,11 +373,16 @@ void dsp_SWR_Meter() {
   snprintf(ioBuffer, sizeof(ioBuffer), "%d", swrData.ReflectedRaw());
   // Serial.print("ReflectedRaw=");
   // Serial.println(ioBuffer);
+#endif
 }
 
 void dsp_FFT() {
-  int min = 1024, max = 0;                            //set minumum & maximum ADC values
-  for (i = 0; i < 128; i++) {                         //take 128 samples
+  int val;
+  int min = 1024, max = 0;                          //set minumum & maximum ADC values
+  char x = 0, ylim = 60;                            //variables for drawing the graphics
+  char im[128], data[128];                          //variables for the FFT
+  
+  for (int i = 0; i < 128; i++) {                     //take 128 samples
     val = analogRead(vu_meter_input);                 //get audio from Analog 1
     val = random(1024); //test
     data[i] = val / 2 - 128;                          //each element of array is val/4-128
@@ -446,7 +394,7 @@ void dsp_FFT() {
   fix_fft(data, im, 7, 0);                            //perform the FFT on data
 
   display.clearDisplay();                             //clear display
-  for (i = 1; i < 64; i++) {                          // In the current design, 60Hz and noise
+  for (int i = 1; i < 64; i++) {                          // In the current design, 60Hz and noise
     int dat = 3 * sqrt(data[i] * data[i] + im[i] * im[i]); //filter out noise and hum
 
     display.drawLine(i * 2 + x, ylim, i * 2 + x, ylim - dat, WHITE); // draw bar graphics for freqs above 500Hz to buffer

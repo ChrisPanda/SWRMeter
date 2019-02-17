@@ -1,16 +1,17 @@
 #include <MenuSystem.h>
 
-//  https://github.com/jonblack/arduino-menusystem
+#ifdef SSD1306
+extern Adafruit_SSD1306 display;
+#else
+extern Adafruit_SH1106 display;
+#endif
 int line;
-  
+
+//  https://github.com/jonblack/arduino-menusystem
 class MyRenderer : public MenuComponentRenderer {
-      
-public:
+
+public:  
    void render(Menu const& menu) const {
-/*
-      MenuComponent const* cp_menu_sel = menu.get_selected();
-      menu.get_current_component()->render(*this);
-*/
         line=10;
         display.clearDisplay(); 
         display.setCursor(0,0);
