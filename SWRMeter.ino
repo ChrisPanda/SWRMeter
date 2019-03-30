@@ -49,8 +49,8 @@ Adafruit_SH1106 display(OLED_RESET);    // reset required for SH1106
 
 #define s_meter_input  A8               // S-Meter analog input (from AGC line)
 #define vu_meter_input A9               // vu-Meter analog input (from audio signal)
-#define fwd_pwr_input  A10              // forward power meter analog input
-#define rev_pwr_input  A11              // reverse power meter analog input
+#define fwd_pwr_input  A11              // forward power meter analog input
+#define rev_pwr_input  A12              // reverse power meter analog input
 
 #define RecXmt_select   7               // receive transmit select (this can come from the PTT or key line)
 #define Alt_Mode_select 8               // alternate display mode select
