@@ -1,6 +1,8 @@
 /*
 FFT, CW Decode for uBITX
 KD8CEC, Ian Lee
+
+Version : 0.7
 -----------------------------------------------------------------------
 License : See fftfunctions.cpp for FFT and CW Decode.
 **********************************************************************/

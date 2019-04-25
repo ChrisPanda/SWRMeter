@@ -34,11 +34,12 @@
 
 #ifdef SSD1306
 // Declaration for SSD1306 display connected using software SPI (default case):
-#define OLED_MOSI   9
-#define OLED_CLK   10
-#define OLED_DC    11
-#define OLED_CS    12
-#define OLED_RESET 13
+#define OLED_CLK    2
+#define OLED_MOSI   4
+#define OLED_RESET  6
+#define OLED_DC     8
+#define OLED_CS    10
+
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, OLED_MOSI, OLED_CLK, OLED_DC, OLED_RESET, OLED_CS);
 #else
 // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
@@ -47,10 +48,10 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, OLED_MOSI, OLED_CLK, OLED_
 Adafruit_SH1106 display(OLED_RESET);    // reset required for SH1106
 #endif
 
-#define s_meter_input  A8               // S-Meter analog input (from AGC line)
-#define vu_meter_input A9               // vu-Meter analog input (from audio signal)
-#define fwd_pwr_input  A11              // forward power meter analog input
-#define rev_pwr_input  A12              // reverse power meter analog input
+#define s_meter_input  A6               // S-Meter analog input (from AGC line)
+#define fwd_pwr_input  A8               // forward power meter analog input
+#define rev_pwr_input  A9               // reverse power meter analog input
+#define vu_meter_input A10              // vu-Meter analog input (from audio signal)
 
 #define RecXmt_select   7               // receive transmit select (this can come from the PTT or key line)
 #define Alt_Mode_select 8               // alternate display mode select
