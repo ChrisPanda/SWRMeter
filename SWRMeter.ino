@@ -206,9 +206,8 @@ void checkI2CnMenu() {
   }
 #endif
 
-// test
-// if (digitalRead(RecXmt_select) == LOW) {
-  if (true) {
+  // TR/RX check
+  if (digitalRead(RecXmt_select) == LOW) {
     if (Xmt_Mode_select == 0)
       dsp_Mode = _SWR;
     else
@@ -239,8 +238,7 @@ void  dsp_VU_Meter() {
   unsigned int sample;                                  // adc reading
 
   while ( millis() - startMillis < sampleWindow ) {
-    //sample = analogRead(vu_meter_input);
-    sample = random (1024);      // test
+    sample = analogRead(vu_meter_input);
     if (sample < 1024) {
       if (sample > SignalMax) {
         SignalMax = sample;                                // saves just the max levels
@@ -385,7 +383,6 @@ void dsp_FFT() {
   
   for (int i = 0; i < 128; i++) {                     //take 128 samples
     val = analogRead(vu_meter_input);                 //get audio from Analog 1
-    val = random(1024); //test
     data[i] = val / 2 - 128;                          //each element of array is val/4-128
     im[i] = 0;                                        //
     if (val > max) max = val;                         //capture maximum level
