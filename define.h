@@ -4,4 +4,4 @@
 #define _ENABLE_MENU
 #define SSD1306
 
-#define VERSION  "V0.5"
+#define VERSION  "V1.0"

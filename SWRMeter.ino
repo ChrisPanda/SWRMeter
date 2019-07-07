@@ -207,17 +207,17 @@ void checkI2CnMenu() {
 #endif
 
   // TR/RX check
-  if (digitalRead(RecXmt_select) == LOW) {
-    if (Xmt_Mode_select == 0)
-      dsp_Mode = _SWR;
-    else
-      dsp_Mode = _POWER;
-  }
-  else {
+  if (digitalRead(RecXmt_select) == LOW) {  // receiving mode
     if (Rec_Mode_select == 0)
       dsp_Mode = _VU_MTR;
     else
       dsp_Mode = _S_MTR;
+  }
+  else {                                    // transmission mode
+    if (Xmt_Mode_select == 0)
+      dsp_Mode = _SWR;
+    else
+      dsp_Mode = _POWER;
   }
 
 #ifdef SWR_H
