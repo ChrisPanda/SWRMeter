@@ -72,7 +72,7 @@ http://arduiniana.org.
  */
 #include "define.h"
  
-#ifdef I2C_H
+#ifdef ENABLE_HAMSKEY_I2C
  
 #include "i2cmeter.h"
 
@@ -357,4 +357,4 @@ void SWSerial_Print(uint8_t *b)
 
 #endif
 
-#endif  // I2C_H
+#endif  // ENABLE_HAMSKEY_I2C

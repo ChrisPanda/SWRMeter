@@ -26,7 +26,7 @@
  */
 #include "define.h"
 
-#ifndef SWR_H
+#ifndef ENABLE_SWR_CLASS
 
 // use a voltage calculation (sensor is a voltage sensor, not a power sensor)
 #define USE_VOLTAGE_CALC
@@ -157,4 +157,4 @@ class SWR {
     }
 };
 
-#endif // SWR_H
+#endif // ENABLE_SWR_CLASS

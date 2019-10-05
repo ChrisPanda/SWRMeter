@@ -18,8 +18,8 @@
 */
 #include <Wire.h>
 #include <Adafruit_GFX.h>                   // https://github.com/adafruit/Adafruit-GFX-Library
-#include <Adafruit_SSD1306.h>               // https://github.com/adafruit/Adafruit_SSD1306
-//#include <Adafruit_SH1106.h>              // https://github.com/wonho-maker/Adafruit_SH1106
+//#include <Adafruit_SSD1306.h>               // https://github.com/adafruit/Adafruit_SSD1306
+#include <Adafruit_SH1106.h>              // https://github.com/wonho-maker/Adafruit_SH1106
 #include <fix_fft.h>
 #include <OneButton.h>
 #include "define.h"
@@ -32,7 +32,7 @@
 #define SCREEN_WIDTH 128                // OLED display width, in pixels
 #define SCREEN_HEIGHT 64                // OLED display height, in pixels
 
-#ifdef SSD1306
+#ifdef OLED_SSD1306
 // Declaration for SSD1306 display connected using software SPI (default case):
 #define OLED_CLK    2
 #define OLED_MOSI   4
@@ -41,17 +41,15 @@
 #define OLED_CS    10
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, OLED_MOSI, OLED_CLK, OLED_DC, OLED_RESET, OLED_CS);
-#else
-// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
+#endif
+
+// Declaration for an SH1106 display connected to I2C (SDA, SCL pins)
+#ifdef OLED_SH1106
 #define OLED_RESET 4                    // reset required for SH1106
 
 Adafruit_SH1106 display(OLED_RESET);    // reset required for SH1106
 #endif
 
-#define s_meter_input  A6               // S-Meter analog input (from AGC line)
-#define fwd_pwr_input  A8               // forward power meter analog input
-#define rev_pwr_input  A9               // reverse power meter analog input
-#define vu_meter_input A10              // vu-Meter analog input (from audio signal)
 
 #define RecXmt_select   7               // receive transmit select (this can come from the PTT or key line)
 #define Alt_Mode_select 8               // alternate display mode select
@@ -73,14 +71,14 @@ const int hMeter = 65;                  // horizontal center for needle animatio
 const int vMeter = 85;                  // vertical center for needle animation (outside of dislay limits)
 const int rMeter = 80;                  // length of needle animation or arch of needle travel
 
-#ifdef SWR_H  
+#ifdef ENABLE_SWR_CLASS
 SWR swrData(fwd_pwr_input, rev_pwr_input);              // New SWR calculator
 #endif
 
 void setup() {
   Serial.begin(9600);
 
-#ifdef I2C_H
+#ifdef ENABLE_HAMSKEY_I2C
   i2cMeterSetup();
 #endif  
     
@@ -92,17 +90,18 @@ void setup() {
   pinMode(RecXmt_select,   INPUT_PULLUP);
   pinMode(Alt_Mode_select, INPUT_PULLUP);
 
-#ifdef SWR_H
+#ifdef ENABLE_SWR_CLASS
   // configure the new SWR algorithm
   swrData.MinPower(MIN_POWER);
   swrData.ScaleForward(FORWARD_SCALE);
   swrData.ScaleReflected(REFLECT_SCALE);
 #endif
 
-#ifdef SSD1306
-  display.begin(SSD1306_SWITCHCAPVCC);         // Address 0x3D for 128x64
-#else
-  display.begin(SH1106_SWITCHCAPVCC, 0x3C);             // needed for SH1106 display
+#ifdef OLED_SSD1306
+  display.begin(SSD1306_SWITCHCAPVCC);              // Address 0x3D for 128x64
+#endif
+#ifdef OLED_SH1106
+  display.begin(SH1106_SWITCHCAPVCC, 0x3C);         // needed for SH1106 display
 #endif
 
   display.clearDisplay();                           // clears display from any library info displayed
@@ -125,7 +124,7 @@ void setup() {
   Rec_Mode_select=0;                            // select  default mode when receive display
   dsp_Mode = _SWR;                              // start with default vu meter
 
-#ifdef _ENABLE_MENU
+#ifdef ENABLE_MENU
   menuEnable = false;
   button.attachLongPressStart(showHideMenu);
   button.attachClick(changeMenuItem);
@@ -147,7 +146,7 @@ void setup() {
 
   // set 80 msec. debouncing time. Default is 50 msec.
   button.setDebounceTicks(80);
-#endif // _ENABLE_MENU
+#endif // ENABLE_MENU
 
   delay(1500);
   display.clearDisplay();
@@ -157,21 +156,21 @@ void loop() {
   checkI2CnMenu();
 
   while (dsp_Mode == _VU_MTR) {
-#ifdef _ENABLE_MENU
+#ifdef ENABLE_MENU
     if (!menuEnable)
 #endif
       dsp_VU_Meter();
     checkI2CnMenu();
   }
   while (dsp_Mode == _S_MTR) {
-#ifdef _ENABLE_MENU
+#ifdef ENABLE_MENU
     if (!menuEnable)
 #endif
       dsp_S_Meter();
     checkI2CnMenu();
   }
   while (dsp_Mode == _POWER) {
-#ifdef _ENABLE_MENU
+#ifdef ENABLE_MENU
     if (!menuEnable)
 #endif
       dsp_PWR_Meter();
@@ -179,7 +178,7 @@ void loop() {
   }
 
   while (dsp_Mode == _SWR) {
-#ifdef _ENABLE_MENU
+#ifdef ENABLE_MENU
     if (!menuEnable)
 #endif
       dsp_SWR_Meter();
@@ -187,7 +186,7 @@ void loop() {
   }
 
   while (dsp_Mode == _ALT) {
-#ifdef _ENABLE_MENU
+#ifdef ENABLE_MENU
     if (!menuEnable)
 #endif
       dsp_FFT();
@@ -199,7 +198,7 @@ void loop() {
 void checkI2CnMenu() {
   button.tick();
 
-#ifdef _ENABLE_MENU
+#ifdef ENABLE_MENU
   if (menuEnable) {
     ms.display();
     return;
@@ -220,11 +219,11 @@ void checkI2CnMenu() {
       dsp_Mode = _POWER;
   }
 
-#ifdef SWR_H
+#ifdef ENABLE_SWR_CLASS
   swrData.Poll();                                   // spend all our spare time reading the transducer for new SWR
 #endif
 
-#ifdef I2C_H
+#ifdef ENABLE_HAMSKEY_I2C
   i2cMeterLoop();
 #endif
 }
@@ -350,7 +349,7 @@ void dsp_SWR_Meter() {
   //display.display();
 
   //  SWR: read A/D and compute SWR
-#ifdef SWR_H  
+#ifdef ENABLE_SWR_CLASS
   FormatFloat(ioBuffer, sizeof(ioBuffer), swrData.Value());
 #endif  
   FormatFloat(ioBuffer, sizeof(ioBuffer), swr);
@@ -364,7 +363,7 @@ void dsp_SWR_Meter() {
   display.display();
   
   //  RAW: read A/D and output raw values
-#ifdef SWR_H
+#ifdef ENABLE_SWR_CLASS
   snprintf(ioBuffer, sizeof(ioBuffer), "%d", swrData.ForwardRaw());
   // Serial.print("ForwardRaw=");
   // Serial.println(ioBuffer);

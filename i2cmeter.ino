@@ -2,13 +2,17 @@
 FFT, CW Decode for uBITX
 KD8CEC, Ian Lee
 
-Version : 0.7
+Version : 0.7 (A7 pin)
+    A7: SIGNAL_METER_ADC
+Version 0.8 (A2, A3 pin)
+    A2: Connect SWR bridge FWD (Forward) of Sensor
+    A3: Connect SWR bridge REV (Reverse) of Sensor
 -----------------------------------------------------------------------
 License : See fftfunctions.cpp for FFT and CW Decode.
 **********************************************************************/
 #include "define.h"
 
-#ifdef I2C_H
+#ifdef ENABLE_HAMSKEY_I2C
 
 #include <EEPROM.h>
 #include "i2cmeter.h"
@@ -476,58 +480,6 @@ int ForwardData(void)
   }
 }
 
-/*
-int SendMeterData(uint8_t isSend)
-{
-  int newScaledSMeter = 0;
-  if (ADC_DIFF > 11)
-  {
-    newScaledSMeter = 8;
-  }
-  else if (ADC_DIFF > 9)
-  {
-    newScaledSMeter = 7;
-  }
-  else if (ADC_DIFF > 8)
-  {
-    newScaledSMeter = 6;
-  }
-  else if (ADC_DIFF > 7)
-  {
-    newScaledSMeter = 5;
-  }
-  else if (ADC_DIFF > 6)
-  {
-    newScaledSMeter = 4;
-  }
-  else if (ADC_DIFF > 5)
-  {
-    newScaledSMeter = 3;
-  }
-  else if (ADC_DIFF > 4)
-  {
-    newScaledSMeter = 2;
-  }
-  else if (ADC_DIFF > 3)
-  {
-    newScaledSMeter = 1;
-  }
-  else
-  {
-    newScaledSMeter = 0;
-  }
-  scaledSMeter = newScaledSMeter;
-
-  if (isSend == 1)
-  {
-    if (L_scaledSMeter != scaledSMeter)
-    {
-      L_scaledSMeter = scaledSMeter;
-      SendCommand1Num(CMD_SMETER, L_scaledSMeter);  
-    }
-  }
-}
-*/
 int SendMeterData(uint8_t isSend)
 {
   //basic : 1.5Khz
@@ -796,7 +748,18 @@ extern double coeff;
 
 #define LAST_TIME_INTERVAL 159
 
+#ifdef I2C_VER_0_7
 int SWRAdcValue = 0;
+#endif
+
+#ifdef I2C_VER_0_8
+float adcFWD = 0;
+float adcRWD = 0;
+uint16_t adjustPower = 230;
+float swrMeasured;
+
+int clcCount = 0;
+#endif
 
 //for boot Delay, a alot of data transfer
 //Delay 2.5 Sec
@@ -827,6 +790,7 @@ void i2cMeterLoop()
   //===========================================
   if (TXStatus == 1)  //TX Mode
   {
+#ifdef I2C_VER_0_7
     int readedValue = 0;
     SMeterToUartIdleCount++;
     if (SMeterToUartIdleCount > 130)          //SWR  
@@ -838,13 +802,103 @@ void i2cMeterLoop()
     }
     else if (SMeterToUartIdleCount == 100)  //POWER 500msec interval
     {
-      readedValue = analogRead(POWER_METER_ADC   );
+      readedValue = analogRead(POWER_METER_ADC);
       SWRAdcValue = analogRead(SWR_METER_ADC);
       SendCommandL('m', readedValue);
       SendCommand1Num('m',2);
       //PWR Send
     }
+#endif // I2C_VER_0_7
+
+#ifdef I2C_VER_0_8
+    //************************************************
+    //Read FWD and RWD
+    adcFWD = adcFWD * 0.8 + analogRead(A2) * 0.2;
+    adcRWD = adcRWD * 0.8 + analogRead(A3) * 0.2;
+
+    if (adcRWD > adcFWD)
+    {
+      adcRWD = adcFWD;
+    }
+
+    //for Realtime LCD Display
+#endif // I2C_VER_0_8
+
     ForwardData();
+
+#ifdef I2C_VER_0_8
+    if (clcCount++ > 10)
+    {
+      //Calculated Power and swr and Send Information
+      clcCount = 0;
+
+      //Calc PWR
+      float PWR = pow(adcFWD, 2);
+      PWR = PWR / adjustPower / 100;
+
+      //Calc SWR
+      float Vratio = adcRWD / adcFWD;
+      if (adcRWD < 0.05 && adcFWD < 0.05)
+      {
+        //No signal
+        swrMeasured = 0;
+      }
+      else if (Vratio > 0.99)
+      {
+        swrMeasured = 1999;
+      }
+      else
+      {
+        swrMeasured = ((1 + Vratio)/ (1 - Vratio));
+      }
+
+      //For Version 0.8
+      //Send SWR Information using Receive Signal Meter Protocol
+      scaledSMeter = (int)(swrMeasured + 0.5);
+      if (scaledSMeter > 9)
+      {
+        scaledSMeter = 9;
+      }
+
+      if (L_scaledSMeter != scaledSMeter)
+      {
+        L_scaledSMeter = scaledSMeter;
+        SendCommand1Num(CMD_SMETER, L_scaledSMeter);
+      }
+
+      //For Version 1.0
+      //need mod uBITX firmware and Nextion LCD and add Power adjust value option (uBITX Manager)
+      //Send Information
+      //SWR Send
+      //SendCommandL('m', SWRAdcValue);
+      //SendCommand1Num('m', 3);
+      //SMeterToUartIdleCount = 0;
+      //Send Power Information
+      int readedValue = (int)(PWR * 100);
+      SendCommandL('m', readedValue);
+      SendCommand1Num('m',2);
+
+      //Delay 250msec ~ 500msec for Nextion LCD Processing (using m protocol)
+
+      for (int i = 0; i < 10; i++)
+      {
+        ForwardData();
+        if (TXStatus != 1)  //if TX -> RX break
+        {
+          break;
+        }
+        delay(25);
+      } //end of delay time
+
+      //Send SWR
+      readedValue = (int)(swrMeasured * 100);
+      SendCommandL('m', readedValue);
+      SendCommand1Num('m', 3);
+
+      //delay(50);
+      //return;
+    }
+#endif // I2C_VER_0_8
     delay(5);
     
     return; //Do not processing ADC, FFT, Decode Morse or RTTY, only Power and SWR Data Return
@@ -980,4 +1034,4 @@ void i2cMeterLoop()
   } //enf of if 
 } //end of main
 
-#endif  // I2C_H
+#endif  // ENABLE_HAMSKEY_I2C
